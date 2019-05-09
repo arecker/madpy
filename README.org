@@ -1,0 +1,8 @@
+#+TITLE: MadPy Demo
+
+This is the accompanying source code for the demonstration I gave at
+[[https://www.meetup.com/MadPython/][MadPython]].  The latest commit represents the final manifestation of
+the web app, which includes a load balancer, autoscaling group, and an
+immutable AMI provisioned with packer, but be sure to checkout the
+previous commits to follow along with the intermediate, simpler
+versions.
