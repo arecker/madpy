@@ -177,3 +177,38 @@ resource "aws_security_group_rule" "sg_to_anywhere" {
   cidr_blocks       = ["0.0.0.0/0"]
   security_group_id = "${aws_security_group.sg.id}"
 }
+
+data "aws_ami" "ubuntu" {
+  most_recent = true
+
+  filter {
+    name   = "name"
+    values = ["ubuntu/images/hvm-ssd/ubuntu-bionic-18.04-amd64-server-*"]
+  }
+
+  filter {
+    name   = "virtualization-type"
+    values = ["hvm"]
+  }
+
+  owners = ["099720109477"] # Canonical
+}
+
+resource "aws_instance" "app" {
+  ami			 = "${data.aws_ami.ubuntu.id}"
+  instance_type		 = "t2.micro"
+  subnet_id		 = "${aws_subnet.public_a.id}"
+  key_name		 = "arecker@zendesk.com" # this was already created in the web UI
+  vpc_security_group_ids = ["${aws_security_group.sg.id}"]
+  user_data = <<EOF
+#!/usr/bin/env bash
+apt-get update && sudo apt-get install -y python3-pip
+git clone https://github.com/arecker/hackme.git /app
+pip3 install -r /app/requirements.txt
+python3 /app/server.py
+EOF
+
+  tags = {
+    Name = "madpy-app"
+  }
+}
