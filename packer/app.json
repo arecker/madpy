@@ -1,0 +1,31 @@
+{
+  "variables": {
+    "source_ami": "",
+    "subnet_id": "",
+    "vpc_id": ""
+  },
+
+  "builders": [{
+    "type": "amazon-ebs",
+    "region": "us-east-2",
+    "vpc_id": "{{ user `vpc_id` }}",
+    "subnet_id": "{{ user `subnet_id` }}",
+    "source_ami": "{{ user `source_ami` }}",
+    "instance_type": "t2.micro",
+    "ssh_username": "ubuntu",
+    "ami_name": "madpy-app-{{timestamp}}",
+    "tags": {
+      "Name": "madpy-app-ami"
+    }
+  }],
+
+  "provisioners": [{
+    "type": "shell",
+    "inline": [
+      "sleep 10",
+      "sudo apt-get update && sudo apt-get install -y python3-pip",
+      "sudo git clone https://github.com/arecker/hackme.git /app",
+      "sudo pip3 install -r /app/requirements.txt"
+    ]
+  }]
+}

@@ -194,16 +194,24 @@ data "aws_ami" "ubuntu" {
   owners = ["099720109477"] # Canonical
 }
 
+data "aws_ami" "app" {
+  most_recent = true
+
+  filter {
+    name   = "name"
+    values = ["madpy-app-*"]
+  }
+
+  owners     = ["self"]
+}
+
 resource "aws_launch_configuration" "app" {
   instance_type	  = "t2.micro"
-  image_id	  = "${data.aws_ami.ubuntu.id}"
+  image_id	  = "${data.aws_ami.app.id}"
   name_prefix     = "madpy-app-launch-config-"
   security_groups = ["${aws_security_group.sg.id}"]
   user_data	  = <<EOF
 #!/usr/bin/env bash
-apt-get update && sudo apt-get install -y python3-pip
-git clone https://github.com/arecker/hackme.git /app
-pip3 install -r /app/requirements.txt
 python3 /app/server.py
 EOF
 
@@ -264,4 +272,16 @@ resource "aws_lb_target_group" "app" {
 resource "aws_autoscaling_attachment" "app" {
   autoscaling_group_name = "${aws_autoscaling_group.app.id}"
   alb_target_group_arn   = "${aws_lb_target_group.app.arn}"
+}
+
+resource "local_file" "ami_variables" {
+  filename = "./packer/variables.json"
+
+  content = <<EOF
+{
+  "source_ami": "${data.aws_ami.ubuntu.id}",
+  "subnet_id": "${aws_subnet.public_a.id}",
+  "vpc_id": "${aws_vpc.main.id}"
+}
+EOF
 }
