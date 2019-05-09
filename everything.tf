@@ -197,7 +197,7 @@ data "aws_ami" "ubuntu" {
 resource "aws_instance" "app" {
   ami			 = "${data.aws_ami.ubuntu.id}"
   instance_type		 = "t2.micro"
-  subnet_id		 = "${aws_subnet.public_a.id}"
+  subnet_id		 = "${aws_subnet.private_a.id}"
   key_name		 = "arecker@zendesk.com" # this was already created in the web UI
   vpc_security_group_ids = ["${aws_security_group.sg.id}"]
   user_data = <<EOF
@@ -211,4 +211,40 @@ EOF
   tags = {
     Name = "madpy-app"
   }
+}
+
+resource "aws_lb" "app" {
+  name		     = "madpy-app-lb"
+  internal	     = false
+  load_balancer_type = "application"
+  security_groups    = ["${aws_security_group.sg.id}"]
+  subnets	     = ["${aws_subnet.public_a.id}", "${aws_subnet.public_b.id}"]
+
+  tags {
+    Name = "madpy-app-lb"
+  }
+}
+
+resource "aws_lb_listener" "app" {
+  load_balancer_arn = "${aws_lb.app.arn}"
+  port              = "80"
+  protocol          = "HTTP"
+
+  default_action {
+    type             = "forward"
+    target_group_arn = "${aws_lb_target_group.app.arn}"
+  }
+}
+
+resource "aws_lb_target_group" "app" {
+  name        = "madpy-app-lb-tg"
+  port        = 5000
+  protocol    = "HTTP"
+  target_type = "ip"
+  vpc_id      = "${aws_vpc.main.id}"
+}
+
+resource "aws_lb_target_group_attachment" "app" {
+  target_group_arn = "${aws_lb_target_group.app.arn}"
+  target_id        = "${aws_instance.app.private_ip}"
 }
