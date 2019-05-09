@@ -194,13 +194,12 @@ data "aws_ami" "ubuntu" {
   owners = ["099720109477"] # Canonical
 }
 
-resource "aws_instance" "app" {
-  ami			 = "${data.aws_ami.ubuntu.id}"
-  instance_type		 = "t2.micro"
-  subnet_id		 = "${aws_subnet.private_a.id}"
-  key_name		 = "arecker@zendesk.com" # this was already created in the web UI
-  vpc_security_group_ids = ["${aws_security_group.sg.id}"]
-  user_data = <<EOF
+resource "aws_launch_configuration" "app" {
+  instance_type	  = "t2.micro"
+  image_id	  = "${data.aws_ami.ubuntu.id}"
+  name_prefix     = "madpy-app-launch-config-"
+  security_groups = ["${aws_security_group.sg.id}"]
+  user_data	  = <<EOF
 #!/usr/bin/env bash
 apt-get update && sudo apt-get install -y python3-pip
 git clone https://github.com/arecker/hackme.git /app
@@ -208,8 +207,27 @@ pip3 install -r /app/requirements.txt
 python3 /app/server.py
 EOF
 
-  tags = {
-    Name = "madpy-app"
+  lifecycle {
+    create_before_destroy = true
+  }
+}
+
+resource "aws_autoscaling_group" "app" {
+  name		       = "madpy-app-autoscaling-group"
+  launch_configuration = "${aws_launch_configuration.app.name}"
+  vpc_zone_identifier  = ["${aws_subnet.private_a.id}", "${aws_subnet.private_b.id}"]
+  min_size             = 2
+  max_size             = 2
+  health_check_type    = "ELB"
+
+  tag {
+    key                 = "Name"
+    value               = "madpy-app"
+    propagate_at_launch = true
+  }
+
+  lifecycle {
+    create_before_destroy = true
   }
 }
 
@@ -240,11 +258,10 @@ resource "aws_lb_target_group" "app" {
   name        = "madpy-app-lb-tg"
   port        = 5000
   protocol    = "HTTP"
-  target_type = "ip"
   vpc_id      = "${aws_vpc.main.id}"
 }
 
-resource "aws_lb_target_group_attachment" "app" {
-  target_group_arn = "${aws_lb_target_group.app.arn}"
-  target_id        = "${aws_instance.app.private_ip}"
+resource "aws_autoscaling_attachment" "app" {
+  autoscaling_group_name = "${aws_autoscaling_group.app.id}"
+  alb_target_group_arn   = "${aws_lb_target_group.app.arn}"
 }
